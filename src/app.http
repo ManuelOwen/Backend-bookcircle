@@ -1,0 +1,30 @@
+@baseUrl = http://localhost:3000
+@token =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmNjc1Yjk5Yy01NzA1LTQwMTItYWJkMC1kZWYwNmY2ZWRhM2MiLCJlbWFpbCI6InJzdEBOYW1lLkpvaG4iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NDk5MDc1NDAsImV4cCI6MTc0OTk5Mzk0MH0.02WatHTiS-GJy4y27rOwfyt730rV6528VFDN0a0qUY4
+
+POST  {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "rst@Name.John",
+  "password": "password123"
+  }
+
+
+###
+
+POST  {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "dankavatha01@gmail.com",
+  "password": "password123"
+}
+
+
+###
+
+GET {{baseUrl}}/books
+Authorization: Bearer {{token}}
+
