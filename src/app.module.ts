@@ -18,7 +18,7 @@ import { LikesModule } from './likes/likes.module';
 import { PersonalLibraryModule } from './personal-library/personal-library.module';
 import { ClubModule } from './club/club.module';
 import { MembershipModule } from './membership/membership.module';
-
+import { AppController } from 'app.controller';
 // Guards
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
@@ -83,7 +83,7 @@ import { SeedModule } from './seed/seed.module';
     MembershipModule,
     SeedModule
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [
     // Global validation pipe
     {

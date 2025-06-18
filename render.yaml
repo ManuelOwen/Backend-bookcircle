@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: nest-api
+    env: node
+    repo: https://github.com/ManuelOwen/Backend-bookcircle.git
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000  # Optional: can be omitted; Render usually auto-assigns
+      # Add your actual environment variables below
+      - key: DATABASE_URL
+        value: postgresql://restaurantdb_owner:NDl9RyiUvz4O@ep-little-mountain-a2o4fz8c-pooler.eu-central-1.aws.neon.tech/BookClub?sslmode=require
+      - key: JWT_SECRET
+        value: your_jwt_secret
+      - key: CLOUDINARY_API_KEY
+        value: 624339478298831
+      - key: CLOUDINARY_SECRET
+        value:btWARC1yDFf4XQGHX2Fg-qSrPxI
+      - key: CLOUDINARY_NAME
+        value: dl2a09yib
