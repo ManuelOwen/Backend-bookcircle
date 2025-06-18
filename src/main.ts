@@ -1,4 +1,3 @@
-
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, HttpStatus, Logger } from '@nestjs/common';
@@ -46,8 +45,8 @@ async function bootstrap() {
 
   // Swagger configuration
   const config = new DocumentBuilder()
-    .setTitle('Reading Circle Reviews API')
-    .setDescription('API for managing book reviews in reading circles')
+    .setTitle('Book Club API')
+    .setDescription('API for managing book reviews in book clubs')
     .setVersion('1.0')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },

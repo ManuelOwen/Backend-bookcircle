@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { TagsService } from './tags.service';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('tags')
 export class TagsController {
@@ -13,22 +14,23 @@ export class TagsController {
   }
 
   @Get()
+  @Public()
   findAll() {
     return this.tagsService.findAll();
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.tagsService.findOne(+id);
+    return this.tagsService.findOne(id);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateTagDto: UpdateTagDto) {
-    return this.tagsService.update(+id, updateTagDto);
+    return this.tagsService.update(id, updateTagDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.tagsService.remove(+id);
+    return this.tagsService.remove(id);
   }
 }

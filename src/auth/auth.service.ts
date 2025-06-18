@@ -1,23 +1,28 @@
-import { Injectable, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { User, UserRole } from '../users/entities/user.entity';
 import { UserResponseDto } from '../users/dto/user-response.dto';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 
 type AuthResponse = {
   user: UserResponseDto;
   token: string;
+  refreshToken: string;
 };
 
 @Injectable()
 export class AuthService {
+  private blacklistedTokens: Set<string> = new Set();
+
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async register(createAuthDto: CreateAuthDto): Promise<AuthResponse> {
@@ -46,9 +51,7 @@ export class AuthService {
 
     const savedUser = await this.userRepository.save(user);
     
-    // Generate JWT token
-    const payload = this.createTokenPayload(savedUser);
-    const token = this.jwtService.sign(payload);
+    const { token, refreshToken } = await this.generateTokens(savedUser);
     const userResponse = new UserResponseDto(savedUser);
 
     return { 
@@ -57,46 +60,125 @@ export class AuthService {
         created_at: savedUser.created_at,
         updated_at: savedUser.updated_at
       },
-      token 
+      token,
+      refreshToken
     };
   }
 
-  async login(email: string, password: string): Promise<AuthResponse> {
+  async login(email: string, password: string) {
     try {
-      // First get user with password
-      const user = await this.userRepository
-        .createQueryBuilder('user')
-        .addSelect('user.password')
-        .where('user.email = :email', { email })
-        .getOne();
+      const user = await this.userRepository.findOne({
+        where: { email },
+        select: {
+          id: true,
+          email: true,
+          password: true,
+          full_name: true,
+          organization: true,
+          role: true,
+          bio: true,
+          avatar_url: true,
+          favorite_genres: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
 
       if (!user) {
-        throw new UnauthorizedException('Invalid email or password');
+        throw new UnauthorizedException('Invalid credentials');
       }
 
-      // Verify password
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {
-        throw new UnauthorizedException('Invalid email or password');
+        throw new UnauthorizedException('Invalid credentials');
+      }
+      
+      const payload = { 
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      };
+
+      const jwtSecret = this.configService.getOrThrow<string>('JWT_SECRET');
+
+      const token = this.jwtService.sign(payload, {
+        secret: jwtSecret,
+        expiresIn: '1d',
+      });
+
+      const refreshToken = this.jwtService.sign(payload, {
+        secret: jwtSecret,
+        expiresIn: '7d',
+      });
+
+      // Remove password from user object
+      const { password: _, ...userWithoutPassword } = user;
+
+      return {
+        success: true,
+        user: userWithoutPassword,
+        token,
+        refreshToken
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async refreshToken(refreshToken: string): Promise<AuthResponse> {
+    try {
+      const payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      });
+
+      const user = await this.userRepository.findOne({ 
+        where: { id: payload.userId } 
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('User not found');
       }
 
-      // Generate JWT token
-      const payload = this.createTokenPayload(user);
-      const token = this.jwtService.sign(payload);
+      const { token, refreshToken: newRefreshToken } = await this.generateTokens(user);
       const userResponse = new UserResponseDto(user);
-      
+
       return {
         user: {
           ...userResponse,
           created_at: user.created_at,
           updated_at: user.updated_at
         },
-        token
+        token,
+        refreshToken: newRefreshToken
       };
     } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+      throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async logout(token: string): Promise<void> {
+    this.blacklistedTokens.add(token);
+  }
+
+  isTokenBlacklisted(token: string): boolean {
+    return this.blacklistedTokens.has(token);
+  }
+
+  private async generateTokens(user: User): Promise<{ token: string; refreshToken: string }> {
+    const payload = this.createTokenPayload(user);
+    
+    const [token, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+        expiresIn: '1h',
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+        expiresIn: '7d',
+      }),
+    ]);
+
+    return { token, refreshToken };
   }
 
   async validateUser(userId: string): Promise<any> {
@@ -107,16 +189,34 @@ export class AuthService {
   }
   
   async getUserById(userId: string): Promise<UserResponseDto> {
-    const user = await this.userRepository.findOne({ 
-      where: { id: userId },
-      select: ['id', 'email', 'full_name', 'role', 'created_at', 'updated_at']
-    });
-    
-    if (!user) {
-      throw new NotFoundException('User not found');
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          full_name: true,
+          organization: true,
+          role: true,
+          bio: true,
+          avatar_url: true,
+          favorite_genres: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      return new UserResponseDto(user);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to get user');
     }
-    
-    return new UserResponseDto(user);
   }
 
   private createTokenPayload(user: User) {
@@ -125,5 +225,33 @@ export class AuthService {
       email: user.email,
       role: user.role 
     };
+  }
+
+  async getCurrentUser(userId: string) {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          full_name: true,
+          organization: true,
+          role: true,
+          bio: true,
+          avatar_url: true,
+          favorite_genres: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      return user;
+    } catch (error) {
+      throw error;
+    }
   }
 }

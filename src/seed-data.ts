@@ -12,6 +12,7 @@ import { getConnection, Repository, createConnection } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as dotenv from 'dotenv';
 import { Book } from './books/entities/book.entity';
+import { Tag } from './tags/entities/tag.entity';
 
 // Load environment variables
 dotenv.config();
@@ -55,12 +56,51 @@ async function seedData() {
   const reviewRepository = connection.getRepository(Review);
   const membershipRepository = connection.getRepository(Membership);
   const personalLibraryRepository = connection.getRepository(PersonalLibrary);
+  const tagRepository = connection.getRepository(Tag);
   
   console.log('Repositories initialized successfully');
   
   const userId = '56963768-b972-41a7-8cf1-826544da7199';
   
   try {
+    // Create tags first
+    const tagData = [
+      { name: 'Fiction', color: '#3B82F6' },
+      { name: 'Mystery', color: '#8B5CF6' },
+      { name: 'Romance', color: '#EC4899' },
+      { name: 'Thriller', color: '#EF4444' },
+      { name: 'Self-Help', color: '#10B981' },
+      { name: 'Biography', color: '#F59E0B' },
+      { name: 'Science Fiction', color: '#06B6D4' },
+      { name: 'Fantasy', color: '#8B5CF6' },
+      { name: 'History', color: '#6B7280' },
+      { name: 'Psychology', color: '#14B8A6' },
+      { name: 'Business', color: '#059669' },
+      { name: 'Finance', color: '#DC2626' },
+      { name: 'Economics', color: '#7C3AED' },
+      { name: 'Memoir', color: '#EA580C' },
+      { name: 'Literary Fiction', color: '#1E40AF' },
+      { name: 'Young Adult', color: '#BE185D' },
+      { name: 'Horror', color: '#991B1B' },
+      { name: 'Historical Fiction', color: '#92400E' },
+    ];
+
+    console.log('Creating tags...');
+    const tags: Tag[] = [];
+    for (const tagInfo of tagData) {
+      const existingTag = await tagRepository.findOne({ where: { name: tagInfo.name } });
+      if (!existingTag) {
+        const tag = tagRepository.create(tagInfo);
+        const savedTag = await tagRepository.save(tag);
+        tags.push(savedTag);
+        console.log(`Created tag: ${savedTag.name}`);
+      } else {
+        tags.push(existingTag);
+        console.log(`Tag already exists: ${existingTag.name}`);
+      }
+    }
+    console.log(`Total tags available: ${tags.length}`);
+
     // Array of book data for seeding
     const bookData = [
       // Fiction Books
